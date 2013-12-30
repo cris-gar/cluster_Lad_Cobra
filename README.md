@@ -205,12 +205,12 @@ gss/krb5i(rw,sync,fsid=0,crossmnt,no_subtree_check)
  __ ESPERAR A QUE LOS ESCLAVOS MONTEN LA CARPETA __
 
 
--Luego
+- Luego
 
 ```
 ssh-keygen -t rsa
 ```
--Posicionarse en carpeta .ssh
+- Posicionarse en carpeta .ssh
 
 ```
 cd /home/cluster/.ssh
