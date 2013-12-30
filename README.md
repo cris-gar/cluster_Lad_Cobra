@@ -238,6 +238,15 @@ contraseña._
 cd /mpi
 ```
 
+-Clonamos el repositorio e ingresamos a este
+
+```
+git clone https://github.com/cris-gar/cluster_Lad_Cobra
+
+cd /mpi/cluster_Lad_Cobra
+```
+
+
 -Compilar
 
 ```
