@@ -235,7 +235,7 @@ contraseña._
 -Ingresar a carpeta maestra
 
 ```
-cd /home/cluster/mpi
+cd /mpi
 ```
 
 -Compilar
