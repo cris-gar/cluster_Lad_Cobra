@@ -12,96 +12,96 @@
     
 #include<stdio.h>
 #include<mpi.h>
-#define NUM_ROWS_A 512 //rows of input [A]
-#define NUM_COLUMNS_A 512 //columns of input [A]
-#define NUM_ROWS_B 512 //rows of input [B]
-#define NUM_COLUMNS_B 512 //columns of input [B]
-#define MASTER_TO_SLAVE_TAG 1 //tag for messages sent from master to slaves
-#define SLAVE_TO_MASTER_TAG 4 //tag for messages sent from slaves to master
+#define NUM_ROWS_A 512 //Filas de la matriz [A]
+#define NUM_COLUMNS_A 512 //Columnas de la matriz [A]
+#define NUM_ROWS_B 512 //Filas de la matriz [B]
+#define NUM_COLUMNS_B 512 //Columnas de la matriz [B]
+#define MASTER_TO_SLAVE_TAG 1 //Etiqueta para mensajes enviados del maestro a esclavos
+#define SLAVE_TO_MASTER_TAG 4 //Etiqueta para mensajes enviados de esclavos a maestro
     
-void makeAB(); //makes the [A] and [B] matrixes
-void printArray(); //print the content of output matrix [C];
-int rank; //process rank   
-int size; //number of processes    
-int i, j, k; //helper variables    
-double mat_a[NUM_ROWS_A][NUM_COLUMNS_A]; //declare input [A]  
-double mat_b[NUM_ROWS_B][NUM_COLUMNS_B]; //declare input [B]  
-double mat_result[NUM_ROWS_A][NUM_COLUMNS_B]; //declare output [C]   
-double start_time; //hold start time   
-double end_time; // hold end time
-int low_bound; //low bound of the number of rows of [A] allocated to a slave 
-int upper_bound; //upper bound of the number of rows of [A] allocated to a slave  
-int portion; //portion of the number of rows of [A] allocated to a slave
+void makeAB(); // Fabrica las [A] y [B] matrices
+void printArray(); //Imprime la salida en una matriz [C];
+int rank; //Rango de procesos   
+int size; //Número de procesos
+int i, j, k; //Variables auxiliares    
+double mat_a[NUM_ROWS_A][NUM_COLUMNS_A]; // Declara entrada en [A]  
+double mat_b[NUM_ROWS_B][NUM_COLUMNS_B]; // Declara entrada en [B]  
+double mat_result[NUM_ROWS_A][NUM_COLUMNS_B]; //Declara una salida [C]   
+double start_time; //mantiene tiempo de inicio   
+double end_time; // mantiene tiempo de fin
+int low_bound; // Límite inferior del número de filas de A asociadas a un esclavo 
+int upper_bound; // Límite superior del número de filas de A asociadas a un esclavo   
+int portion; // porción del número de filas de [A] asociadas a un esclavo
 
-MPI_Status status; // store status of a MPI_Recv
-MPI_Request request; //capture request of a MPI_Isend
+MPI_Status status; //  Almacenaje de estado de un  MPI_Recv
+MPI_Request request; // Captura de solicitud de un MPI_Isend
 
 int main(int argc, char *argv[])
 {
-    MPI_Init(&argc, &argv); //initialize MPI operations
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); //get the rank
-    MPI_Comm_size(MPI_COMM_WORLD, &size); //get number of processes
+    MPI_Init(&argc, &argv); // Inicializa operaciones MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank); // Obtén el rango
+    MPI_Comm_size(MPI_COMM_WORLD, &size); // Obtén el número de procesos
 
-    /* master initializes work*/
+    /* maestro inicializa la carga*/
     if (rank == 0) {
     	makeAB();
     	start_time = MPI_Wtime();
-    	for (i = 1; i < size; i++) {//for each slave other than the master
-    		portion = (NUM_ROWS_A / (size - 1)); // calculate portion without master
+    	for (i = 1; i < size; i++) {//"Para cada esclavo que no sea el maestro
+    		portion = (NUM_ROWS_A / (size - 1)); // clacula porción sin el maestro
     		low_bound = (i - 1) * portion;
-    		if (((i + 1) == size) && ((NUM_ROWS_A % (size - 1)) != 0)) {//if rows of [A] cannot be equally divided among slaves
-    			upper_bound = NUM_ROWS_A; //last slave gets all the remaining rows
+    		if (((i + 1) == size) && ((NUM_ROWS_A % (size - 1)) != 0)) {// Si las filas en [A] no pueden serigualmente divididas entre esclavos
+    			upper_bound = NUM_ROWS_A; // Último esclavo, se queda con las filas sobrantes
     		} else {
-    			upper_bound = low_bound + portion; //rows of [A] are equally divisable among slaves
+    			upper_bound = low_bound + portion; //las filas de [A] son equitativamente divisibles entre esclavos
     		}
-    		//send the low bound first without blocking, to the intended slave
+    		// Envía el límite inferior primero sin bloquear, al esclavo  deseado
     		MPI_Isend(&low_bound, 1, MPI_INT, i, MASTER_TO_SLAVE_TAG, MPI_COMM_WORLD, &request);
-    		//next send the upper bound without blocking, to the intended slave
+    		// Luego, en vía el l{imite superior sin bloquear al eslavo deseado
     		MPI_Isend(&upper_bound, 1, MPI_INT, i, MASTER_TO_SLAVE_TAG + 1, MPI_COMM_WORLD, &request);
-    		//finally send the allocated row portion of [A] without blocking, to the intended slave
+    		// Finalmente envía el la porción asignada de filas de [A] sin bloquear al eslavo deseado
     		MPI_Isend(&mat_a[low_bound][0], (upper_bound - low_bound) * NUM_COLUMNS_A, MPI_DOUBLE, i, MASTER_TO_SLAVE_TAG + 2, MPI_COMM_WORLD, &request);
     	}
     }
     
-    //broadcast [B] to all the slaves
+    // Transmite a [B] a todos los esclavos
     MPI_Bcast(&mat_b, NUM_ROWS_B*NUM_COLUMNS_B, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    /* work done by slaves*/
+    /* Carga hecha por los esclavos*/
     if (rank > 0) {
-    	//receive low bound from the master
+    	// Recibe límite inferior del maestro.
     	MPI_Recv(&low_bound, 1, MPI_INT, 0, MASTER_TO_SLAVE_TAG, MPI_COMM_WORLD, &status);
-    	//next receive upper bound from the master
+    	// Luego, recibe límite superior desde el maestro
     	MPI_Recv(&upper_bound, 1, MPI_INT, 0, MASTER_TO_SLAVE_TAG + 1, MPI_COMM_WORLD, &status);
-   	 //finally receive row portion of [A] to be processed from the master
+   	 // Finalmente recibe la porción de filas de [A] a ser procesadas por el maestro
     	MPI_Recv(&mat_a[low_bound][0], (upper_bound - low_bound) * NUM_COLUMNS_A, MPI_DOUBLE, 0, MASTER_TO_SLAVE_TAG + 2, MPI_COMM_WORLD, &status);
-    	for (i = low_bound; i < upper_bound; i++) {//iterate through a given set of rows of [A]
-    		for (j = 0; j < NUM_COLUMNS_B; j++) {//iterate through columns of [B]
+    	for (i = low_bound; i < upper_bound; i++) {// Itera a através de un conjunto de filas dadas de [A]
+    		for (j = 0; j < NUM_COLUMNS_B; j++) {// Itera a através de un conjunto de culomnas dadas de [B]
     				mat_result[i][j] = (mat_a[i][j] - mat_b[i][j]);
     		}
     	}
     
-    	//send back the low bound first without blocking, to the master
+    	//Envía de vuelta el límite inferior primero, sin bloquear, al maestro
     	MPI_Isend(&low_bound, 1, MPI_INT, 0, SLAVE_TO_MASTER_TAG, MPI_COMM_WORLD, &request);
-    	//send the upper bound next without blocking, to the master
+    	//Envía de vuelta el límite superior primero, sin bloquear, al maestro
     	MPI_Isend(&upper_bound, 1, MPI_INT, 0, SLAVE_TO_MASTER_TAG + 1, MPI_COMM_WORLD, &request);
-    	//finally send the processed portion of data without blocking, to the master
+    	//Finalmente envía la porcion procesada de datos sin bloquear al maestro
     	MPI_Isend(&mat_result[low_bound][0], (upper_bound - low_bound) * NUM_COLUMNS_B, MPI_DOUBLE, 0, SLAVE_TO_MASTER_TAG + 2, MPI_COMM_WORLD, &request);
     }
 
-    /* master gathers processed work*/
+    /* El maestro recibe la carga*/
     if (rank == 0) {
-    	for (i = 1; i < size; i++) {// untill all slaves have handed back the processed data
-    		//receive low bound from a slave
+    	for (i = 1; i < size; i++) {// Hasta que todos los esclavos hayan devuelto los datos procesados
+    		//Recibe límite inferior de un esclavo
     		MPI_Recv(&low_bound, 1, MPI_INT, i, SLAVE_TO_MASTER_TAG, MPI_COMM_WORLD, &status);
-    		//receive upper bound from a slave
+    		//Recibe límite superior de un esclavo
     		MPI_Recv(&upper_bound, 1, MPI_INT, i, SLAVE_TO_MASTER_TAG + 1, MPI_COMM_WORLD, &status);
-    		//receive processed data from a slave
+    		//Recibe datos procesados de un esclavo
     		MPI_Recv(&mat_result[low_bound][0], (upper_bound - low_bound) * NUM_COLUMNS_B, MPI_DOUBLE, i, SLAVE_TO_MASTER_TAG + 2, MPI_COMM_WORLD, &status);
     	}
     	end_time = MPI_Wtime();
     	printf("\nRunning Time = %f\n\n", end_time - start_time);
     	printArray();
     }
-    MPI_Finalize(); //finalize MPI operations
+    MPI_Finalize(); // Finaliza operaciones MPI
     return 0;
 }
 
